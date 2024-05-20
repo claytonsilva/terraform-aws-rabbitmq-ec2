@@ -1,0 +1,3 @@
+packer/*.pkrvars.hcl
+*.tfvars
+.terraform

@@ -1,0 +1,39 @@
+---
+- hosts: default
+  become: true
+
+  tasks:
+    - name: Setting Timezone
+      shell: rm -f /etc/localtime; ln -s /usr/share/zoneinfo/Etc/GMT+3 /etc/localtime
+
+    - name: Installing base repos for package repo manager
+      yum:
+        name: "{{ packages }}"
+        state: present
+        lock_timeout: 120
+      vars:
+        packages:
+          - yum-utils
+          - shadow-utils
+
+    - name: Config repo to install consul agent
+      shell: |
+        sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+
+    - name: Update Yum repos
+      yum:
+        name: "*"
+        state: latest
+    - name: Installing repos
+      yum:
+        name: "{{ packages }}"
+        state: present
+        lock_timeout: 120
+      vars:
+        packages:
+          - amazon-efs-utils
+          - docker
+          - dnsmasq
+          - jq
+          - consul
+          - cronie
