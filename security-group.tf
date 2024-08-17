@@ -1,4 +1,4 @@
-resource "aws_security_group" "nlb_internal" {
+resource "aws_security_group" "lb" {
   name        = "${var.name}-nlb-internal"
   description = "Security Group RabbitMQ Cluster (nlb internal)"
   vpc_id      = local.vpc_id
@@ -12,7 +12,7 @@ resource "aws_security_group" "nlb_internal" {
   }
 
   tags = merge(var.default_tags, {
-    Account = data.aws_iam_account_alias.this.account_alias
+    Account = local.account_alias
     Name    = var.name
   })
 
@@ -36,7 +36,7 @@ resource "aws_security_group" "main" {
   }
 
   tags = merge(var.default_tags, {
-    Account = data.aws_iam_account_alias.this.account_alias
+    Account = local.account_alias
     Name    = var.name
   })
 
@@ -56,29 +56,29 @@ resource "aws_security_group_rule" "enable_internal_comm" {
   description       = "Allow inter node traffic"
 }
 
-### internal comm between internal nlb and ec2
+### internal comm between nlb and ec2
 resource "aws_security_group_rule" "enable_ports_to_internal_nlb" {
-  for_each                 = local.rabbit_service_internal_ports
+  for_each                 = local.rabbit_service_ports
   type                     = "ingress"
   security_group_id        = aws_security_group.main.id
-  source_security_group_id = aws_security_group.nlb_internal.id
+  source_security_group_id = aws_security_group.lb.id
   protocol                 = "tcp"
-  from_port                = each.key
-  to_port                  = each.key
-  description              = "Allow traffic to rabbitmq - from inner VPC to internal nlb - ${each.value}"
+  from_port                = each.value.port
+  to_port                  = each.value.port
+  description              = "Allow traffic to rabbitmq - from inner VPC to internal nlb - ${each.key}"
 }
 
 
 ### internal comm between nlb and local vpc
 resource "aws_security_group_rule" "enable_ports_vpc" {
-  for_each          = local.rabbit_service_internal_ports
+  for_each          = local.nlb_listener_ports
   type              = "ingress"
-  security_group_id = aws_security_group.nlb_internal.id
+  security_group_id = aws_security_group.lb.id
   cidr_blocks       = [local.vpc_cidr]
   protocol          = "tcp"
-  from_port         = each.key
-  to_port           = each.key
-  description       = "Allow traffic to rabbitmq - from inner VPC - ${each.value}"
+  from_port         = each.value.port
+  to_port           = each.value.port
+  description       = "Allow traffic to rabbitmq - from inner VPC - ${each.key}"
 }
 
 #### security group for efs mount
@@ -88,7 +88,7 @@ resource "aws_security_group" "efs" {
   vpc_id      = local.vpc_id
 
   tags = merge(var.default_tags, {
-    Account = data.aws_iam_account_alias.this.account_alias
+    Account = local.account_alias
     Name    = "${var.name}-efs"
   })
 }
@@ -98,8 +98,8 @@ resource "aws_security_group_rule" "enable_comm_from_rabbit_cluster" {
   type                     = "ingress"
   security_group_id        = aws_security_group.efs.id
   source_security_group_id = aws_security_group.main.id
-  protocol                 = "-1"
-  from_port                = 0
-  to_port                  = 0
+  protocol                 = "TCP"
+  from_port                = 2049 # efs mount port
+  to_port                  = 2049 # efs mount port
   description              = "Allow traffic to rabbitmq instances"
 }

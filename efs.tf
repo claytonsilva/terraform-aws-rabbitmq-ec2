@@ -1,10 +1,6 @@
 #tfsec:ignore:AWS048
 resource "aws_efs_file_system" "rabbit_data" {
   tags = var.default_tags
-
-  lifecycle {
-    ignore_changes = [size_in_bytes]
-  }
 }
 
 resource "aws_efs_mount_target" "alpha" {

@@ -32,36 +32,14 @@ data "aws_vpc" "this" {
   id = var.vpc_id
 }
 
-data "aws_subnets" "private" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.this.id]
-  }
-  filter {
-    name   = "tag:subnet-scope"
-    values = ["private"]
-  }
-}
-
-data "aws_subnets" "public" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.this.id]
-  }
-  filter {
-    name   = "tag:subnet-scope"
-    values = ["public"]
-  }
-}
-
-data "aws_subnet" "private" {
-  for_each = toset(data.aws_subnets.private.ids)
+data "aws_subnet" "instances" {
+  for_each = toset(var.instances_subnet_ids)
   id       = each.value
 }
 
 data "aws_route53_zone" "hosted_zone" {
   provider = aws.route53_account
-  name     = var.hosted_zone
+  name     = var.domain_name
 }
 
 
@@ -72,8 +50,8 @@ data "template_file" "init" {
   template = file("init.sh")
   vars = {
     region                          = var.region
-    domain                          = "ecomm.intranet"
-    cluster_name                    = "ecomm"
+    domain                          = var.consul_domain
+    cluster_name                    = var.cluster_name
     name                            = each.value.name
     admin_username                  = "admin"
     monitor_username                = "monitor"
@@ -96,7 +74,7 @@ data "template_file" "init" {
 }
 
 data "aws_iam_policy_document" "secret_manager_ronly_crypt" {
-  count = var.secret_kms_arn != "" ? 1 : 0
+  for_each = local.has_kms
   statement {
     effect = "Allow"
     actions = [
@@ -118,7 +96,7 @@ data "aws_iam_policy_document" "secret_manager_ronly_crypt" {
 }
 
 data "aws_iam_policy_document" "secret_manager_ronly" {
-  count = var.secret_kms_arn != "" ? 0 : 1
+  for_each = local.does_not_have_kms
   statement {
     effect = "Allow"
     actions = [
@@ -129,4 +107,3 @@ data "aws_iam_policy_document" "secret_manager_ronly" {
     ]
   }
 }
-
